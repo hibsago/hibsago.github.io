@@ -9,8 +9,8 @@
 <div class="notice"><b>重要提醒：</b>此工具為依照使用者提供條件建立的原型，僅供醫療專業人員核對與教育用途，不取代醫師判斷、正式仿單或試驗計畫書。正式臨床使用前，必須由醫學／法規團隊驗證所有門檻、單位、例外與優先順序。請勿輸入可識別病患身分的資料。所有計算僅在本機瀏覽器執行，不會上傳或儲存檢驗數據。</div>
 <section class="card"><h2>01｜Patient & Treatment Information</h2><div class="grid">
 <div class="field"><label>Patient ID（匿名代碼）</label><input id="pid" placeholder="Optional"></div>
-<div class="field"><label>Current treatment status</label><select id="status"><option value="on">Currently on treatment</option><option value="paused">Treatment paused</option></select></div>
-<div class="field"><label>Alternative cause identified?</label><select id="cause"><option value="unknown">Undetermined</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+<div class="field"><label>ALT serial decline confirmed?</label><select id="decline"><option value="unknown">Not confirmed</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+<div class="field"><label>Treatment stage</label><select id="stage"><option value="300">On 300 mg QW</option><option value="150">Resumed 150 mg QW</option><option value="paused">Treatment paused</option></select></div>
 <div class="field"><label>ALT ≥10× ULN duration (weeks)</label><input id="weeks" type="number" min="0" step=".1"></div>
 <div class="field"><label>Pretreatment eGFR</label><input id="base" type="number" min="0" step=".1"></div>
 <div class="field"><label>ALT ULN</label><div>40 U/L（原型固定值）</div></div><div class="field"><label>Total bilirubin ULN</label><div>1.2 mg/dL（原型固定值）</div></div>
@@ -18,7 +18,7 @@
 <section class="card"><h2>02｜Laboratory Data Input</h2><p class="muted">可輸入 1–4 次檢測；請依時間順序填寫。Baseline eGFR 請填於上方。</p><div class="tablewrap"><table><thead><tr><th>Laboratory</th><th>Test 1</th><th>Test 2</th><th>Test 3</th><th>Test 4</th></tr></thead><tbody>
 <tr><td>Test date</td><td><input id="date1" type="date"></td><td><input id="date2" type="date"></td><td><input id="date3" type="date"></td><td><input id="date4" type="date"></td></tr>
 <tr><td>ALT <small>(U/L)</small></td><td><input id="alt1" type="number" min="0" step="any"></td><td><input id="alt2" type="number" min="0" step="any"></td><td><input id="alt3" type="number" min="0" step="any"></td><td><input id="alt4" type="number" min="0" step="any"></td></tr><tr><td>Total bilirubin <small>(mg/dL)</small></td><td><input id="tb1" type="number" min="0" step="any"></td><td><input id="tb2" type="number" min="0" step="any"></td><td><input id="tb3" type="number" min="0" step="any"></td><td><input id="tb4" type="number" min="0" step="any"></td></tr><tr><td>PLT <small>(×10⁹/L)</small></td><td><input id="plt1" type="number" min="0" step="any"></td><td><input id="plt2" type="number" min="0" step="any"></td><td><input id="plt3" type="number" min="0" step="any"></td><td><input id="plt4" type="number" min="0" step="any"></td></tr><tr><td>eGFR <small>(mL/min/1.73m²)</small></td><td><input id="egfr1" type="number" min="0" step="any"></td><td><input id="egfr2" type="number" min="0" step="any"></td><td><input id="egfr3" type="number" min="0" step="any"></td><td><input id="egfr4" type="number" min="0" step="any"></td></tr><tr><td>uACR <small>(mg/mg)</small></td><td><input id="uacr1" type="number" min="0" step="any"></td><td><input id="uacr2" type="number" min="0" step="any"></td><td><input id="uacr3" type="number" min="0" step="any"></td><td><input id="uacr4" type="number" min="0" step="any"></td></tr>
-</tbody></table></div><button class="btn" onclick="assess()">Assess treatment</button><button class="btn secondary" onclick="resetForm()">Clear all</button></section>
+</tbody></table></div><div id="causebox" class="field" style="display:none;margin:14px 0;padding:12px;background:#fff4df;border-radius:8px"><label>uACR abnormal — alternative cause identified?</label><select id="cause" onchange="assess()"><option value="unknown">Undetermined</option><option value="yes">Yes</option><option value="no">No</option></select></div><button class="btn" onclick="assess()">Assess treatment</button><button class="btn secondary" onclick="resetForm()">Clear all</button></section>
 <section class="card"><h2>03｜Automated Assessment <span id="badge" class="badge green">Awaiting data</span></h2><div id="summary">輸入至少一次檢測數據後，點選 Assess treatment 查看判讀結果。</div><div id="results"></div></section>
 <section class="card"><h2>04｜Laboratory Trend Analysis</h2><p class="muted" id="trend">輸入檢測數據後，將顯示各指標數值摘要。</p><canvas id="chart" style="width:100%;height:180px"></canvas></section>
 <p class="muted" style="text-align:center">Prototype v1.1 · Local browser calculation only · No AI API / no token usage · No patient data transmitted or stored.</p>
@@ -28,11 +28,11 @@ const $=id=>document.getElementById(id),v=id=>$(id).value===''?null:Number($(id)
 function tests(){let a=[];for(let i=1;i<=4;i++){let t={i,date:$('date'+i).value,alt:v('alt'+i),tb:v('tb'+i),plt:v('plt'+i),egfr:v('egfr'+i),uacr:v('uacr'+i)};if(['alt','tb','plt','egfr','uacr'].some(k=>t[k]!==null)||t.date)a.push(t)}return a}
 function assess(){
 const ts=tests(),t=ts.at(-1);
-if(!t){$('summary').textContent='請至少輸入一組檢測數據。';return}
-const paused=$('status').value==='paused',cause=$('cause').value,base=v('base'),weeks=v('weeks');
+if(!t){$('causebox').style.display='none';$('summary').textContent='請至少輸入一組檢測數據。';return}
+const stage=$('stage').value,paused=stage==='paused',on150=stage==='150',cause=$('cause').value,base=v('base'),weeks=v('weeks');$('causebox').style.display=t.uacr!==null&&t.uacr>=.5?'block':'none';
 const has=x=>x!==null&&Number.isFinite(x), ratio=(x,u)=>has(x)?x/u:null;
 let out=[],overall=0,block=false,unknown=false,hasResume=false;
-function add(n,level,d,a){out.push({n,l:level,d,a});if(level===3)overall=3;else if(level===2&&overall<3)overall=2;else if(level===1&&overall<2)overall=1;if(level===2||level===3)block=true;if(level===1)unknown=true;if(level===4)hasResume=true}
+function add(n,level,d,a){out.push({n,l:level,d,a});if(level===3)overall=3;else if(level===2&&overall<3)overall=2;else if(level===1&&overall<2)overall=1;if(level===2||level===3)block=true;if(level===1)unknown=true;if(level===4||level===5)hasResume=true}
 function priorTrigger(fn){return ts.slice(0,-1).some(fn)}
 const ar=ratio(t.alt,40),br=ratio(t.tb,1.2);
 const liverPause=x=>{let a=ratio(x.alt,40),b=ratio(x.tb,1.2);return a!==null&&b!==null&&((a>=12&&b<1.5)||(a>=3&&b>=1.5&&b<2))};
@@ -47,6 +47,13 @@ else add('Liver function',2,'肝功能尚未符合恢復條件','Continue pause;
 }else if(ar!==null&&ar>=10&&weeks===null)add('Liver function',1,'ALT ≥10× ULN，持續週數未填','請輸入持續週數以排除永久停藥條件。');
 else if(ar!==null&&ar>=10&&ar<12&&br!==null&&br<1.5)add('Liver function',0,'ALT 10–<12× ULN 且 bilirubin <1.5× ULN','No dosage change（但須排除持續 ≥4 週）。');
 else if(ar!==null||br!==null)add('Liver function',0,'目前無已確認肝功能暫停條件','No liver-related dose adjustment trigger identified; 仍須確認未輸入的檢驗項目。');
+if(on150){
+const a=ts.filter(x=>has(x.alt)).map(x=>x.alt);
+if(ar===null||br===null)add('150 → 300 mg escalation',1,'ALT 或 bilirubin 未填','無法確認加量條件。');
+else if(ar>=10||br>=1.5)add('150 → 300 mg escalation',2,'肝功能異常','Do not escalate; reassess treatment.');
+else if($('decline').value==='yes'&&a.length>=2&&a.at(-1)<a.at(-2))add('150 → 300 mg escalation',5,'已恢復 150 mg，ALT 持續下降已確認','May consider increase to 300 mg QW, subject to other safety criteria and protocol review.');
+else add('150 → 300 mg escalation',1,'目前使用 150 mg QW','Continue 150 mg QW; confirm serial ALT downward trajectory before considering 300 mg.');
+}
 if(has(t.plt)){
 const p=t.plt,previous=priorTrigger(x=>has(x.plt)&&x.plt<100);
 if(p<50)add('Platelet count',3,'PLT <50 ×10⁹/L','Permanently discontinue.');
@@ -83,13 +90,14 @@ if(overall===3)label='Permanently discontinue';
 else if(block)label='Continue pause / Pause treatment';
 else if(paused&&unknown)label='Resumption not confirmed';
 else if(paused&&hasResume)label='Resumption criteria met — review dose';
+else if(on150&&out.some(x=>x.l===5))label='Escalation criteria met — review 300 mg';
 else if(paused)label='Insufficient history to confirm resumption';
 else if(unknown)label='Review required';
 else label='No dosage change trigger identified';
-$('badge').className='badge '+(overall===3?'red':block||unknown?'amber':'green');$('badge').textContent=label;
-$('summary').innerHTML='<b>'+label+'</b><p class="muted">'+(paused?'目前狀態：Treatment paused。逐項比對歷次觸發條件及最新恢復條件；所有曾導致暫停的項目均需符合恢復條件。':'目前狀態：On treatment。')+' 最後輸入 Test '+t.i+'；請核對完整檢驗紀錄與正式 protocol。</p>';
-$('results').innerHTML=out.map(x=>'<div class="item '+(x.l===3?'red':x.l===2||x.l===1?'amber':'green')+'"><b>'+x.n+' — '+(x.l===3?'PERMANENTLY DISCONTINUE':x.l===2?'PAUSE / CONTINUE PAUSE':x.l===4?'RESUMPTION CRITERION MET':x.l===1?'REVIEW REQUIRED':'NO CHANGE / MONITOR')+'</b><p>'+x.d+'</p><p><b>Guidance:</b> '+x.a+'</p></div>').join('');
+$('badge').className='badge '+(overall===3||paused&&hasResume&&!block&&!unknown?'red':block||unknown?'amber':'green');$('badge').textContent=label;
+$('summary').innerHTML='<b>'+label+'</b><p class="muted">'+(paused?'目前狀態：Treatment paused。逐項比對歷次觸發條件及最新恢復條件；所有曾導致暫停的項目均需符合恢復條件。':on150?'目前狀態：Resumed 150 mg QW。評估是否具備升至 300 mg 的條件。':'目前狀態：On 300 mg QW。')+' 最後輸入 Test '+t.i+'；請核對完整檢驗紀錄與正式 protocol。</p>';
+$('results').innerHTML=out.map(x=>'<div class="item '+(x.l===3||x.l===4||x.l===5?'red':x.l===2||x.l===1?'amber':'green')+'"><b>'+x.n+' — '+(x.l===3?'PERMANENTLY DISCONTINUE':x.l===2?'PAUSE / CONTINUE PAUSE':x.l===4?'RESUMPTION CRITERION MET':x.l===5?'ESCALATION CRITERION MET':x.l===1?'REVIEW REQUIRED':'NO CHANGE / MONITOR')+'</b><p>'+x.d+'</p><p><b>Guidance:</b> '+x.a+'</p></div>').join('');
 $('trend').textContent='已輸入 '+ts.length+' 次檢測。'+['alt','tb','plt','egfr','uacr'].map(k=>k.toUpperCase()+': '+ts.map(x=>x[k]===null?'—':x[k]).join(' → ')).join('　|　');
 }
-function resetForm(){document.querySelectorAll('input').forEach(x=>x.value='');$('status').value='on';$('cause').value='unknown';$('results').innerHTML='';$('summary').textContent='輸入至少一次檢測數據後，點選 Assess treatment 查看判讀結果。';$('badge').textContent='Awaiting data';$('badge').className='badge green';$('trend').textContent='輸入檢測數據後，將顯示各指標數值摘要。'}
+function resetForm(){document.querySelectorAll('input').forEach(x=>x.value='');$('stage').value='300';$('decline').value='unknown';$('cause').value='unknown';$('causebox').style.display='none';$('results').innerHTML='';$('summary').textContent='輸入至少一次檢測數據後，點選 Assess treatment 查看判讀結果。';$('badge').textContent='Awaiting data';$('badge').className='badge green';$('trend').textContent='輸入檢測數據後，將顯示各指標數值摘要。'}
 </script></html>
