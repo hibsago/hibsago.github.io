@@ -26,19 +26,70 @@
 <script>
 const $=id=>document.getElementById(id),v=id=>$(id).value===''?null:Number($(id).value);
 function tests(){let a=[];for(let i=1;i<=4;i++){let t={i,date:$('date'+i).value,alt:v('alt'+i),tb:v('tb'+i),plt:v('plt'+i),egfr:v('egfr'+i),uacr:v('uacr'+i)};if(['alt','tb','plt','egfr','uacr'].some(k=>t[k]!==null)||t.date)a.push(t)}return a}
-function assess(){let ts=tests(),t=ts.at(-1);if(!t){$('summary').textContent='請至少輸入一組檢測數據。';return}
-let out=[],sev=0;const add=(n,l,d,a)=>{out.push({n,l,d,a});sev=Math.max(sev,l)},ar=t.alt===null?null:t.alt/40,tr=t.tb===null?null:t.tb/1.2,w=v('weeks');
-if((ar!==null&&ar>=10&&w!==null&&w>=4)||(ar!==null&&ar>=3&&tr!==null&&tr>=2)){let q=[];if(ar>=10&&w>=4)q.push('ALT ≥10× ULN 持續 ≥4 週');if(ar>=3&&tr>=2)q.push('ALT ≥3× ULN 且 bilirubin ≥2× ULN');add('Liver function',3,q.join('；'),'Permanently discontinue.')}
-else if(ar!==null&&tr!==null&&ar>=3&&tr>=1.5&&tr<2)add('Liver function',2,'ALT '+ar.toFixed(2)+'× ULN；bilirubin '+tr.toFixed(2)+'× ULN','Pause. When ALT <10× ULN and bilirubin <1.5× ULN, resume 150 mg QW; if ALT downward trajectory, increase to 300 mg QW.');
-else if(ar!==null&&tr!==null&&ar>=12&&tr<1.5)add('Liver function',2,'ALT '+ar.toFixed(2)+'× ULN；bilirubin '+tr.toFixed(2)+'× ULN','Pause. When ALT <10× ULN, resume 150 mg QW; if ALT continues to decline, increase to 300 mg QW.');
-else if(ar!==null&&ar>=10&&w===null)add('Liver function',1,'ALT '+ar.toFixed(2)+'× ULN；未輸入持續時間','請輸入 ALT ≥10× ULN 持續週數，確認是否符合 ≥4 週永久停藥條件。');
-else if(ar!==null&&ar>=10&&ar<12&&tr!==null&&tr<1.5)add('Liver function',0,'ALT '+ar.toFixed(2)+'× ULN；bilirubin '+tr.toFixed(2)+'× ULN','No dosage change；若 ALT ≥10× ULN 持續 ≥4 週則永久停藥。');
-else if(ar!==null&&ar<10)add('Liver function',0,'ALT '+ar.toFixed(2)+'× ULN','No liver-related adjustment trigger identified.');
-if(t.plt!==null){if(t.plt<50)add('Platelet count',3,'PLT '+t.plt+' ×10⁹/L','Permanently discontinue.');else if(t.plt<75)add('Platelet count',2,'PLT '+t.plt+' ×10⁹/L','Pause. Resume 300 mg QW when PLT ≥100; monitor every 2–3 days until 3 consecutive counts ≥75.');else if(t.plt<100)add('Platelet count',2,'PLT '+t.plt+' ×10⁹/L','Pause. Resume 300 mg QW when PLT ≥100.');else if(t.plt<140)add('Platelet count',0,'PLT '+t.plt+' ×10⁹/L','No dosage change.');else add('Platelet count',0,'PLT '+t.plt+' ×10⁹/L','No platelet-related adjustment trigger.')}
-let base=v('base');if(t.egfr!==null&&base>0){let ds=ts.filter(x=>x.egfr!==null).map(x=>(base-x.egfr)/base*100),two=ds.some((x,i)=>i>0&&x>30&&ds[i-1]>30);if(two)add('Renal function',2,'eGFR decrease >30% from baseline for ≥2 consecutive readings','Pause. When eGFR recovers to ≥85% of baseline, resume 300 mg QW.');else add('Renal function',0,'Latest eGFR '+(100*t.egfr/base).toFixed(1)+'% of baseline','No confirmed ≥2 consecutive readings with >30% decline.');}else if(t.egfr!==null)add('Renal function',0,'Pretreatment eGFR baseline missing','Enter baseline eGFR to assess renal trend.');
-if(t.uacr!==null){if(t.uacr>=2){let c=$('cause').value;if(c==='yes')add('Urine albumin (uACR)',2,'uACR '+t.uacr+' mg/mg；alternative cause identified','Pause; if alternative cause identified, resume 300 mg QW.');else if(c==='no')add('Urine albumin (uACR)',3,'uACR '+t.uacr+' mg/mg；alternative cause cannot be identified','Pause; if no alternative cause can be identified, permanently discontinue.');else add('Urine albumin (uACR)',2,'uACR '+t.uacr+' mg/mg；alternative cause undetermined','Pause. Determine alternative cause: if identified resume 300 mg QW; if none can be identified permanently discontinue.');}else if(t.uacr>=.5)add('Urine albumin (uACR)',2,'uACR '+t.uacr+' mg/mg','Pause. When uACR <0.5 mg/mg, or if alternative cause identified, resume 300 mg QW.');else add('Urine albumin (uACR)',0,'uACR '+t.uacr+' mg/mg','No uACR-related adjustment trigger.')}
-if($('status').value==='paused'){let c=[];if(ar!==null)c.push('ALT <10× ULN: '+(ar<10?'Met':'Not met'));if(tr!==null)c.push('bilirubin <1.5× ULN: '+(tr<1.5?'Met':'Not met'));if(t.plt!==null)c.push('PLT ≥100: '+(t.plt>=100?'Met':'Not met'));if(t.egfr!==null&&base>0)c.push('eGFR ≥85% baseline: '+(t.egfr>=base*.85?'Met':'Not met'));if(t.uacr!==null)c.push('uACR <0.5: '+(t.uacr<.5?'Met':'Not met'));out.push({n:'Resumption checklist',l:0,d:'Current status: Treatment paused.',a:c.join(' · ')||'Enter relevant laboratory values.'})}
-let label=sev===3?'Permanently discontinue':sev===2?'Pause treatment':sev===1?'Review required':'No dosage change trigger identified';$('badge').className='badge '+(sev===3?'red':sev===2||sev===1?'amber':'green');$('badge').textContent=label;$('summary').innerHTML='<b>'+label+'</b><p class="muted">依最後一次已輸入的檢測結果（Test '+t.i+')及必要的歷次趨勢判讀。請逐項檢視下方結果；多項異常需一併考量。</p>';$('results').innerHTML=out.map(x=>'<div class="item '+(x.l===3?'red':x.l===2?'amber':'green')+'"><b>'+x.n+'　'+(x.l===3?'PERMANENT DISCONTINUATION':x.l===2?'PAUSE TREATMENT':x.l===1?'REVIEW':'NO CHANGE / MONITOR')+'</b><p>'+x.d+'</p><p><b>Guidance:</b> '+x.a+'</p></div>').join('');
-$('trend').textContent='已輸入 '+ts.length+' 次檢測。'+['ALT','tb','plt','egfr','uacr'].map(k=>k.toUpperCase()+': '+ts.map(x=>x[k]===null?'—':x[k]).join(' → ')).join('　|　');}
+function assess(){
+const ts=tests(),t=ts.at(-1);
+if(!t){$('summary').textContent='請至少輸入一組檢測數據。';return}
+const paused=$('status').value==='paused',cause=$('cause').value,base=v('base'),weeks=v('weeks');
+const has=x=>x!==null&&Number.isFinite(x), ratio=(x,u)=>has(x)?x/u:null;
+let out=[],overall=0,block=false,unknown=false,hasResume=false;
+function add(n,level,d,a){out.push({n,l:level,d,a});if(level===3)overall=3;else if(level===2&&overall<3)overall=2;else if(level===1&&overall<2)overall=1;if(level===2||level===3)block=true;if(level===1)unknown=true;if(level===4)hasResume=true}
+function priorTrigger(fn){return ts.slice(0,-1).some(fn)}
+const ar=ratio(t.alt,40),br=ratio(t.tb,1.2);
+const liverPause=x=>{let a=ratio(x.alt,40),b=ratio(x.tb,1.2);return a!==null&&b!==null&&((a>=12&&b<1.5)||(a>=3&&b>=1.5&&b<2))};
+const liverPermanent=x=>{let a=ratio(x.alt,40),b=ratio(x.tb,1.2);return a!==null&&b!==null&&a>=3&&b>=2};
+const liverHistory=priorTrigger(liverPause),liverEverPermanent=ts.some(liverPermanent)||(ar!==null&&ar>=10&&weeks!==null&&weeks>=4);
+if(liverEverPermanent)add('Liver function',3,'符合 ALT ≥3× ULN 且 bilirubin ≥2× ULN，或 ALT ≥10× ULN 持續 ≥4 週','Permanently discontinue.');
+else if(liverPause(t))add('Liver function',2,'目前 ALT '+ar.toFixed(2)+'× ULN；bilirubin '+br.toFixed(2)+'× ULN','Pause treatment. 待 ALT <10× ULN 且 bilirubin <1.5× ULN（若先前因兩者異常而暫停）後，可依 protocol 評估以 150 mg QW 恢復。');
+else if(paused&&liverHistory){
+if(ar===null||br===null)add('Liver function',1,'過去曾觸發肝功能暫停；目前缺少 ALT 或 bilirubin','無法確認恢復條件。');
+else if(ar<10&&br<1.5){let alts=ts.filter(x=>has(x.alt)).map(x=>x.alt);let declining=alts.length>=2&&alts.at(-1)<alts.at(-2);add('Liver function',4,'肝功能恢復條件已達成：ALT <10× ULN 且 bilirubin <1.5× ULN','May resume 150 mg QW. '+(declining?'ALT 最新一次下降；若持續下降且符合正式 protocol，可考慮 increase to 300 mg QW。':'尚無充分連續下降證據；不應自動判定可加至 300 mg QW。'))}
+else add('Liver function',2,'肝功能尚未符合恢復條件','Continue pause; require ALT <10× ULN and bilirubin <1.5× ULN.');
+}else if(ar!==null&&ar>=10&&weeks===null)add('Liver function',1,'ALT ≥10× ULN，持續週數未填','請輸入持續週數以排除永久停藥條件。');
+else if(ar!==null&&ar>=10&&ar<12&&br!==null&&br<1.5)add('Liver function',0,'ALT 10–<12× ULN 且 bilirubin <1.5× ULN','No dosage change（但須排除持續 ≥4 週）。');
+else if(ar!==null||br!==null)add('Liver function',0,'目前無已確認肝功能暫停條件','No liver-related dose adjustment trigger identified; 仍須確認未輸入的檢驗項目。');
+if(has(t.plt)){
+const p=t.plt,previous=priorTrigger(x=>has(x.plt)&&x.plt<100);
+if(p<50)add('Platelet count',3,'PLT <50 ×10⁹/L','Permanently discontinue.');
+else if(p<100)add('Platelet count',2,'PLT '+p+' ×10⁹/L','Pause. When PLT ≥100 resume 300 mg QW.'+(p<75?' Check every 2–3 days until 3 consecutive platelet counts ≥75.':''));
+else if(paused&&previous)add('Platelet count',4,'PLT 已恢復 ≥100 ×10⁹/L','May resume 300 mg QW (platelet criterion).');
+else add('Platelet count',0,'PLT '+p+' ×10⁹/L','No dosage change.');
+}
+if(has(t.egfr)){
+if(!(base>0))add('Renal function',1,'缺少 pretreatment eGFR','請輸入 baseline，否則無法判斷暫停與恢復。');
+else{
+const values=ts.filter(x=>has(x.egfr)),drops=values.map(x=>(base-x.egfr)/base*100);
+const triggered=drops.some((d,i)=>i>0&&d>30&&drops[i-1]>30);
+const historicTriggered=drops.slice(0,-1).some((d,i)=>i>0&&d>30&&drops[i-1]>30);
+const pct=(100*t.egfr/base).toFixed(1);
+if(paused&&historicTriggered&&t.egfr>=base*.85)add('Renal function',4,'eGFR 已恢復至 baseline 的 '+pct+'%（≥85%）','May resume 300 mg QW (renal criterion).');
+else if(triggered&&t.egfr<base*.85)add('Renal function',2,'連續 ≥2 次 eGFR 較 baseline 下降 >30%','Pause. Resume 300 mg QW when eGFR ≥85% of pretreatment baseline.');
+else if(paused&&historicTriggered)add('Renal function',2,'eGFR 目前為 baseline 的 '+pct+'%','Continue pause; 尚未恢復至 baseline 的 85%。');
+else add('Renal function',0,'eGFR 目前為 baseline 的 '+pct+'%','No active renal dose-adjustment trigger.');
+}}
+if(has(t.uacr)){
+const u=t.uacr,prior=priorTrigger(x=>has(x.uacr)&&x.uacr>=.5);
+if(u>=2){
+if(cause==='no')add('Urine albumin (uACR)',3,'uACR ≥2 mg/mg；無法找到其他原因','Permanently discontinue (when alternative cause cannot be identified).');
+else if(cause==='yes'&&paused)add('Urine albumin (uACR)',4,'uACR ≥2 mg/mg；已找到其他原因','May resume 300 mg QW per stated alternative-cause exception; confirm medical review.');
+else add('Urine albumin (uACR)',2,'uACR ≥2 mg/mg；alternative cause '+cause,'Pause. '+(cause==='yes'?'已找到其他原因：依 protocol 評估恢復 300 mg QW。':'需釐清是否存在其他原因。'));
+}else if(u>=.5){
+if(cause==='yes'&&paused)add('Urine albumin (uACR)',4,'uACR 0.5–<2 mg/mg；已找到其他原因','May resume 300 mg QW per alternative-cause exception.');
+else add('Urine albumin (uACR)',2,'uACR 0.5–<2 mg/mg','Pause. Resume 300 mg QW when uACR <0.5 or alternative cause identified.');
+}else if(paused&&prior)add('Urine albumin (uACR)',4,'uACR 已恢復 <0.5 mg/mg','May resume 300 mg QW.');
+else add('Urine albumin (uACR)',0,'uACR <0.5 mg/mg','No uACR dose adjustment trigger.');
+}
+let label;
+if(overall===3)label='Permanently discontinue';
+else if(block)label='Continue pause / Pause treatment';
+else if(paused&&unknown)label='Resumption not confirmed';
+else if(paused&&hasResume)label='Resumption criteria met — review dose';
+else if(paused)label='Insufficient history to confirm resumption';
+else if(unknown)label='Review required';
+else label='No dosage change trigger identified';
+$('badge').className='badge '+(overall===3?'red':block||unknown?'amber':'green');$('badge').textContent=label;
+$('summary').innerHTML='<b>'+label+'</b><p class="muted">'+(paused?'目前狀態：Treatment paused。逐項比對歷次觸發條件及最新恢復條件；所有曾導致暫停的項目均需符合恢復條件。':'目前狀態：On treatment。')+' 最後輸入 Test '+t.i+'；請核對完整檢驗紀錄與正式 protocol。</p>';
+$('results').innerHTML=out.map(x=>'<div class="item '+(x.l===3?'red':x.l===2||x.l===1?'amber':'green')+'"><b>'+x.n+' — '+(x.l===3?'PERMANENTLY DISCONTINUE':x.l===2?'PAUSE / CONTINUE PAUSE':x.l===4?'RESUMPTION CRITERION MET':x.l===1?'REVIEW REQUIRED':'NO CHANGE / MONITOR')+'</b><p>'+x.d+'</p><p><b>Guidance:</b> '+x.a+'</p></div>').join('');
+$('trend').textContent='已輸入 '+ts.length+' 次檢測。'+['alt','tb','plt','egfr','uacr'].map(k=>k.toUpperCase()+': '+ts.map(x=>x[k]===null?'—':x[k]).join(' → ')).join('　|　');
+}
 function resetForm(){document.querySelectorAll('input').forEach(x=>x.value='');$('status').value='on';$('cause').value='unknown';$('results').innerHTML='';$('summary').textContent='輸入至少一次檢測數據後，點選 Assess treatment 查看判讀結果。';$('badge').textContent='Awaiting data';$('badge').className='badge green';$('trend').textContent='輸入檢測數據後，將顯示各指標數值摘要。'}
 </script></html>
